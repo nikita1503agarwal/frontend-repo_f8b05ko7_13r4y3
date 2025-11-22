@@ -1,73 +1,74 @@
-function App() {
+import { useEffect, useMemo, useState } from 'react'
+import Map from './components/Map'
+import Sidebar from './components/Sidebar'
+import Details from './components/Details'
+
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+export default function App() {
+  const [stations, setStations] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [center, setCenter] = useState({ lat: 20.5937, lng: 78.9629 })
+  const [zoom, setZoom] = useState(5)
+  const [filters, setFilters] = useState({})
+
+  const fetchStations = async (extra = {}) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      const f = { ...filters, ...extra }
+      if (f.connector) params.append('connector', f.connector)
+      if (f.min_power) params.append('min_power', f.min_power)
+      if (f.city) params.append('city', f.city)
+      if (f.q) params.append('q', f.q)
+      const res = await fetch(`${BACKEND}/api/stations?${params.toString()}`)
+      const data = await res.json()
+      setStations(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchStations()
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchStations(), 200)
+    return () => clearTimeout(t)
+  }, [filters])
+
+  const handleLocate = () => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude
+      const lng = pos.coords.longitude
+      setCenter({ lat, lng })
+      setZoom(12)
+      try {
+        const res = await fetch(`${BACKEND}/api/stations/near?lat=${lat}&lng=${lng}&radius_km=25`)
+        const data = await res.json()
+        setStations(data)
+      } catch (e) {}
+    })
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Subtle pattern overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05),transparent_50%)]"></div>
-
-      <div className="relative min-h-screen flex items-center justify-center p-8">
-        <div className="max-w-2xl w-full">
-          {/* Header with Flames icon */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center mb-6">
-              <img
-                src="/flame-icon.svg"
-                alt="Flames"
-                className="w-24 h-24 drop-shadow-[0_0_25px_rgba(59,130,246,0.5)]"
-              />
-            </div>
-
-            <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-              Flames Blue
-            </h1>
-
-            <p className="text-xl text-blue-200 mb-6">
-              Build applications through conversation
-            </p>
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-8 shadow-xl mb-6">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                1
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Describe your idea</h3>
-                <p className="text-blue-200/80 text-sm">Use the chat panel on the left to tell the AI what you want to build</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4 mb-6">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                2
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Watch it build</h3>
-                <p className="text-blue-200/80 text-sm">Your app will appear in this preview as the AI generates the code</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                3
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Refine and iterate</h3>
-                <p className="text-blue-200/80 text-sm">Continue the conversation to add features and make changes</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-sm text-blue-300/60">
-              No coding required • Just describe what you want
-            </p>
-          </div>
+    <div className="min-h-screen w-full flex flex-col">
+      <header className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white">
+        <div className="font-semibold">Chargeway Map (Demo)</div>
+        <div className="text-sm text-slate-600">India EV chargers • Demo data</div>
+      </header>
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[320px_1fr]">
+        <Sidebar onFiltersChange={setFilters} onLocate={handleLocate} loading={loading} />
+        <div className="relative">
+          <Map center={center} zoom={zoom} stations={stations} onMarkerClick={setSelected} />
+          <Details station={selected} onClose={() => setSelected(null)} />
         </div>
       </div>
     </div>
   )
 }
-
-export default App
